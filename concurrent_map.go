@@ -66,6 +66,22 @@ func (m ConcurrentMap) Upsert(key string, value interface{}, cb UpsertCb) (res i
 	return res
 }
 
+type InsertCb func(exist bool, valueInMap interface{}, newValue interface{}) (interface{}, error)
+
+func (m ConcurrentMap) Insert(key string, value interface{}, cb InsertCb) error {
+	shard := m.GetShard(key)
+	shard.Lock()
+	v, ok := shard.items[key]
+	res, err := cb(ok, v, value)
+	if err != nil {
+		shard.Unlock()
+		return err
+	}
+	shard.items[key] = res
+	shard.Unlock()
+	return nil
+}
+
 // Sets the given value under the specified key if no value was associated with it.
 func (m ConcurrentMap) SetIfAbsent(key string, value interface{}) bool {
 	// Get map shard.
